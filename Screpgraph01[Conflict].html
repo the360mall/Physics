@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<link rel="stylesheet" type="text/css" href="css/aeche2.css">
+		<link rel="stylesheet" href="css/preloader.css" type="text/css"/>
+		<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" type="text/css"/>
+		<link rel=stylesheet href="css/info.css"/>
+        
+		<script type="text/javascript" src="js/Three.js"></script>
+		<script async type='text/javascript' src='js/THREEx.KeyboardState.js'></script>
+		<script async type='text/javascript' src='js/THREEx.FullScreen.js'></script>
+		<script async type='text/javascript' src='js/THREEx.WindowResize1024.js'></script>
+		<script type='text/javascript' src='js/Detector.js'></script>
+		<script type='text/javascript' src='js/cannon.js'></script>
+		<script type='text/javascript' src='js/BokehShader2.js'></script>
+		<script type='text/javascript' src='js/Tween.js'></script>
+		<script async type='text/javascript' src='js/Stats.js'></script>
+		<script async type='text/javascript' src='js/threex.rendererstats.js'></script>
+		<script type="text/javascript" src="js/jquery-1.10.1.min.js"></script>
+		<script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+		<script type='text/javascript' src='js/CSS3DRenderer.js'></script>
+		<script src="js/info.js"></script>
+		<script type="text/javascript">
+		//<![CDATA[
+			$(window).load(function() { 
+				$("#status").fadeOut(); 
+				$("#preloader").delay(450).fadeOut("slow");
+			})
+
+	window.onload = function()
+			{	
+				var projector, mouse = { x: 0, y: 0 }, INTERSECTED;
+				var canvas1, context1, texture1;
+				var aspect_ratio = 16/9;
+				var RENDER_WIDTH = 1024 ;
+				var RENDER_HEIGHT = Math.round(RENDER_WIDTH / aspect_ratio);
+				var morphs = [];
+				var domEvent;
+				var rendererCSS;
+				var sprite1x = RENDER_WIDTH/2 ;
+				var sprite1y = RENDER_HEIGHT *0.96;
+
+				projector = new THREE.Projector();				
+
+			function cursorPositionInCanvas(canvas, event) {
+	            var x, y;
+	            canoffset = $(canvas).offset();
+	            x = event.clientX + document.body.scrollLeft + document.documentElement.scrollLeft - Math.floor(canoffset.left);
+	            y = event.clientY + document.body.scrollTop + document.documentElement.scrollTop - Math.floor(canoffset.top) + 1;
+	            return [x,y];
+	        	}
+
+		// Scene
+
+                var scene = new THREE.Scene();
+				var keyboard = new THREEx.KeyboardState();
+				var container = document.getElementById('container');
+	            var renderer = new THREE.WebGLRenderer( { antialias: true });
+					renderer.setSize(RENDER_WIDTH, RENDER_HEIGHT);
+					renderer.sortObjects = false;
+					//renderer.setSize( window.innerWidth, window.innerHeight );
+					renderer.setClearColor(0x000000, 1);
+					renderer.sortObjects = false;
+					container.appendChild(renderer.domElement);		
+
+
+				THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+				container.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				container.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
+        // Camera
+
+                var camera = new THREE.PerspectiveCamera(70, RENDER_WIDTH / RENDER_HEIGHT, 0.1, 50000);
+					camera.position.set (290,130,0);
+					scene.add(camera);
+
+				THREEx.WindowResize(renderer, camera);
+
+		// Stats
+
+				var stats;
+					stats = new Stats();
+					stats.domElement.style.position = 'absolute';
+					stats.domElement.style.bottom = '0px';
+					stats.domElement.style.left = '80px';
+					stats.domElement.style.zIndex = 100;
+					container.appendChild( stats.domElement );
+
+				var rendererStats	= new THREEx.RendererStats()
+					rendererStats.domElement.style.position	= 'absolute'
+					rendererStats.domElement.style.left	= '0px'
+					rendererStats.domElement.style.bottom	= '0px'
+					document.body.appendChild( rendererStats.domElement )
+
+
+	
+			function onDocumentMouseMove( event )
+				{
+					// the following line would stop any other event handler from firing
+					// (such as the mouse's TrackballControls)
+					// event.preventDefault();
+
+					// update sprite position
+					//sprite1.position.set( sprite1x, sprite1y, 0, 0 );
+
+
+					// update the mouse
+					// mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+					// mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+					mouse.x = ( event.clientX / $("canvas").width() ) *2 - 1;
+					mouse.y = - ( event.clientY / $("canvas").height() ) *2 + 1;
+
+				}
+
+
+			function onDocumentMouseDown( event ) {
+
+				    event.preventDefault();
+
+				    var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
+					projector.unprojectVector( vector, camera );
+					var ray = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );	
+				    var intersects = ray.intersectObjects( scene.children );
+
+				    if (( intersects.length > 0 ) && ( intersects [ 0 ].name !== "" )) {
+				    	INTERSECTED = intersects[ 0 ].object;
+				        alert(INTERSECTED.name);
+					}
+					else 
+						{	
+							// there are no intersections
+							INTERSECTED = null;
+						}
+				}
+
+		//Define Physics World
+          
+	        world = new CANNON.World();
+	        world.gravity.set(0,-980,0);
+	        world.broadphase = new CANNON.NaiveBroadphase();
+	        world.solver.iterations =150;
+	        world.defaultContactMaterial.contactEquationStiffness = 6e11;
+       		world.defaultContactMaterial.contactEquationRegularizationTime = 1;
+
+       	//Define physical material for all objects
+
+       		var slipperyMat = new CANNON.Material();
+			var friction = 100;
+			var restitution = 0;
+			var slipperyContact = new CANNON.ContactMaterial(slipperyMat,slipperyMat,friction,restitution);
+			world.addContactMaterial(slipperyContact);
+
+		//Body of the First Person Controls
+			//This will hold the change for position and will interact with all phisical objects
+			//keyboard keys: Left, Right, Up, Down
+	        shape = new CANNON.Box(new CANNON.Vec3(30,30,30))
+	        mass =0.1;
+	        body = new CANNON.RigidBody(mass,shape,slipperyMat);
+	        body.position.set (-5,35,1200);
+
+	        world.add(body);
+	        bodyGeometry = new THREE.CubeGeometry( 60,60,60 );
+	        bodyMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: false } );
+	        bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial );
+	        bodyMesh.visible = true;
+	        bodyMesh.useQuaternion = true;
+	        scene.add( bodyMesh );
+
+	    //Head of the First Person Controls
+	    	//This will hold all the rotation of the camera: keyboard keys A,W,S,D
+
+
+			    	
+
+	    	headGeometry = new THREE.CubeGeometry( 50,50,50 );
+	        headMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: false } );
+	        head = new THREE.Mesh(headGeometry, headMaterial );
+	        head.visible = true;
+	        scene.add( head );
+       
+	    //Physical Objects - Objects that will interact with the First Person Controls
+	    	//Function to quickly generate phisical objects and dispaly objects
+	    function physicsLoader (posX, posZ, posY, length, width, height)
+		    {
+		    	phyBox = new CANNON.Box(new CANNON.Vec3(width/2, height/2, length/2))
+		    	mass = 0;
+		    	phyBody =  new CANNON.RigidBody(mass,phyBox);
+		    	phyBody.position.set (posX, posZ, -posY);
+		    	world.add(phyBody);
+		    	/*
+		    	phyGeometry = new THREE.CubeGeometry( width, height, length );
+		    	phyMaterial= new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true } );
+		    	phyObj = new THREE.Mesh(phyGeometry, phyMaterial );
+		    	phyObj.position.set (posX, posZ, -posY);
+		    	scene.add( phyObj );*/
+		    }
+
+		    physicsLoader(0,-28,33,2600,1100,50);
+		    physicsLoader(0,507,33,2600,1100,50);
+		    physicsLoader(-511,250,33,2600,50,500);
+		    physicsLoader(511,250,33,2600,50,500);
+		    physicsLoader(-2.3,250,1298,50,950,500);
+		    physicsLoader(-2.3,250,-1233,50,950,500);
+		    physicsLoader(-44,250,32,30,180,500);
+		    physicsLoader(-151,250,32,390,30,500);
+		    physicsLoader(334,65,33,460,297,130);
+   
+		//Dispaly Objects
+
+			var jsonLoader = new THREE.JSONLoader();			
+			jsonLoader.load( "Screpgraph_HD/structure.js", addStaticModelToScene );	
+			jsonLoader.load( "Screpgraph_HD/frontDesk.js", addStaticModelToScene );
+			jsonLoader.load( "Screpgraph_HD/assetGuitar.js", addStaticModelToScene );	
+			jsonLoader.load( "Screpgraph_HD/entrance.js", addStaticModelToScene );	
+			function addStaticModelToScene( geometry, materials ) 
+				{
+				var material = new THREE.MeshFaceMaterial( materials );
+				staticMesh = new THREE.Mesh( geometry, material );
+				staticMesh.name = "Structure";
+				scene.add( staticMesh );
+				}
+	
+
+		// Lights
+			scene.add( new THREE.AmbientLight( 0xFFFFFF ));
+
+			pointLight1 = new THREE.PointLight( 0xffffff, 0.66,1600);
+					pointLight1.position.set(-4,315,635);
+					scene.add( pointLight1 );
+			pointLight2 = new THREE.PointLight( 0xffffff, 0.66,1600);
+					pointLight2.position.set(-4,315,-775);
+					scene.add( pointLight2 );
+		//Function to connect the physical objects with dispaly objects - this is loaded in setInterval function
+
+	function updatePhysics() 	{
+          	timeStep=1/60
+         	// Step the physics world
+         	world.step(timeStep);
+
+         	head.position.y = body.position.y;  //Camera height
+         	head.position.x = body.position.x;  
+         	head.position.z = body.position.z - 160;
+         	body.quaternion.copy(head.quaternion);
+
+         	body.position.copy(bodyMesh.position);
+         	body.quaternion.copy(bodyMesh.quaternion);
+         	//body.angularVelocity.set(0,10,0);
+
+ 								}
+
+
+		MovingCube = new THREE.Mesh( new THREE.CubeGeometry( 1, 1, 1 ), new THREE.MeshNormalMaterial({color: 0xffffff, transparent: true, opacity: 0.0}) );
+				MovingCube.position.set(-8,220,1000);
+				MovingCube.visible = false;
+				MovingCube.useQuaternion = true;
+				scene.add( MovingCube );
+
+	
+		function update_controls()
+				{
+					var delta = clock.getDelta(); // seconds.
+					var moveDistance =15;
+					var rotateAngle = Math.PI / 60;   // pi/2 radians (90 degrees) per second
+
+
+
+						if ( keyboard.pressed("up") )
+							{
+							body.position.z -= moveDistance;
+							body.position.x -= moveDistance*(-body.quaternion.z);
+							}
+						if ( keyboard.pressed("down") )
+							{
+							body.position.z += moveDistance;
+							}
+						if ( keyboard.pressed("left") )
+							{
+							body.position.x -= moveDistance;
+								}
+						if ( keyboard.pressed("right") )
+							{
+							body.position.x += moveDistance;	
+							}
+					// rotate left/right/up/down
+					var rotation_matrix = new THREE.Matrix4().identity();
+					if ( keyboard.pressed("A") )
+						body.angularVelocity.set(0,10,0);
+						body.angularDamping =50;
+
+					if ( keyboard.pressed("D") )
+						body.angularVelocity.set(0,-10,0);
+						body.angularDamping = 0.5;
+
+					if ( keyboard.pressed("W")  ){
+						rotation_matrix = new THREE.Matrix4().makeRotationX(rotateAngle);
+						}
+
+					if ( keyboard.pressed("S")  ){
+						rotation_matrix = new THREE.Matrix4().makeRotationX(-rotateAngle);
+						}
+
+					console.log(body.quaternion.x);
+/*
+					if ( keyboard.pressed("A") || keyboard.pressed("D") || 
+						 keyboard.pressed("W") || keyboard.pressed("S") )
+						{
+							head.matrix.multiply(rotation_matrix);
+							head.rotation.setEulerFromRotationMatrix(head.matrix);
+						}
+
+					var relativeCameraOffset = new THREE.Vector3(0,0,66);
+
+					var cameraOffset = relativeCameraOffset.applyMatrix4( head.matrixWorld );
+
+					camera.position.x = cameraOffset.x;
+					camera.position.y = cameraOffset.y;
+					camera.position.z = cameraOffset.z;
+					camera.lookAt( body.position );
+
+
+					camera.up.set(0, 1, 0)
+					console.log (head.rotation.y);
+		*/			
+				}
+
+					camera.position.set (-5,180,1200);
+
+				var clock = new THREE.Clock();
+
+		setInterval(function() 
+					{
+				    	var delta = clock.getDelta();
+						for ( var i = 0; i < morphs.length; i ++ ) 
+						{
+						morph = morphs[ i ];
+						morph.updateAnimation( 100 * delta );
+						}
+
+						update_controls();
+						updatePhysics();
+						stats.update();
+                   		renderer.render(scene, camera);
+                   		rendererStats.update(renderer);
+					}, 24);
+			};
+        </script>
+    </head>
+    <body>
+    	<div id="preloader">
+			<div id="status">Loading scene</div>
+		</div>
+		<div id="infoButton"></div>
+		<div id="container" style="text-align: center;"></div>
+		<div id="infoBox" title="Info Box" style="width:460px;">
+			<img src="img/gui.png" alt="GUI" width="364" height="147"  > 
+		</div>
+
+   	
+    </body>
+</html>

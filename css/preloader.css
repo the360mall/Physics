@@ -1,0 +1,27 @@
+﻿@charset "utf-8";
+
+/* Preloader */
+#preloader {
+	position:absolute;
+	top:0;
+	left:0;
+	right:0;
+	bottom:0;
+	background-color:#fff; /* change if the mask should have another color then white */
+	z-index:999; /* makes sure it stays on top */
+}
+
+#status {
+	color:#000;
+	text-align: center;
+	font-size: 1em;
+	width:500px;
+	height:500px;
+	position:absolute;
+	left:50%; 
+	top:50%;
+	background-image:url(../img/qtani.gif);
+	background-repeat:no-repeat;
+	background-position:center;
+	margin:-250px 0 0 -250px; /* is width and height divided by two */
+}

@@ -161,6 +161,7 @@
 	        body.position.set (-444,15,-27);
 
 	        world.add(body);
+
 	        bodyGeometry = new THREE.CubeGeometry( 60,60,60 );
 	        bodyMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: false } );
 	        bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial );
@@ -273,6 +274,7 @@
 				MovingCube.visible = false;
 				MovingCube.useQuaternion = true;
 				scene.add( MovingCube );
+				
 
 		DummyCube = new THREE.Mesh( new THREE.CubeGeometry( 10, 10, 10 ), new THREE.MeshNormalMaterial({color: 0xffffff, transparent: false, wireframe:true}) );
 			DummyCube.rotation.y = -Math.PI/2;
